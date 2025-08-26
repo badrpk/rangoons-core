@@ -1,13 +1,20 @@
 const https = require('https');
+const readline = require('readline');
 
 // Porkbun API Configuration
 const PORKBUN_API_KEY = 'pk1_1cbdd6744bd2857132ac1e03b0e2b0d0a7cd964d3aeab7fb1a36f296a1da388c';
-const PORKBUN_SECRET_KEY = ''; // You'll need to provide this
+let PORKBUN_SECRET_KEY = ''; // Will be prompted for
 const DOMAIN = 'rangoons.my';
 const STATIC_IP = '154.57.212.38';
 
 // Porkbun API endpoints
 const PORKBUN_API_BASE = 'https://porkbun.com/api/json/v3';
+
+// Create readline interface for user input
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
 
 // Colors for console output
 const colors = {
@@ -39,6 +46,32 @@ function logWarning(message) {
 
 function logInfo(message) {
     log(`ℹ️  ${message}`, 'blue');
+}
+
+// Prompt user for secret key
+function promptForSecretKey() {
+    return new Promise((resolve) => {
+        log('', 'reset');
+        log('🔑 Porkbun Secret API Key Required', 'bright');
+        log('====================================', 'bright');
+        log('', 'reset');
+        logInfo('To get your Secret API Key:');
+        log('1. Login to https://porkbun.com', 'cyan');
+        log('2. Go to Account → API Access', 'cyan');
+        log('3. Copy your Secret API Key (starts with sk1_)', 'cyan');
+        log('', 'reset');
+        
+        rl.question('Enter your Porkbun Secret API Key: ', (secretKey) => {
+            if (secretKey.trim()) {
+                PORKBUN_SECRET_KEY = secretKey.trim();
+                logSuccess('Secret API Key received!');
+                resolve(true);
+            } else {
+                logError('Secret API Key cannot be empty!');
+                resolve(false);
+            }
+        });
+    });
 }
 
 // Make HTTPS request to Porkbun API
@@ -132,13 +165,6 @@ async function createOrUpdateDNSRecord(record) {
 async function configureRangoonsDNS() {
     log('🚀 Configuring DNS Records for Rangoons Edge Computing System', 'bright');
     log('================================================================', 'bright');
-    
-    if (!PORKBUN_SECRET_KEY) {
-        logError('❌ PORKBUN_SECRET_KEY is required!');
-        logWarning('Please add your Porkbun Secret API Key to the script');
-        logInfo('You can find it in your Porkbun account under API Access');
-        return false;
-    }
     
     // Get current records
     const currentRecords = await getCurrentDNSRecords();
@@ -263,6 +289,14 @@ async function main() {
         log(`Porkbun API: ${PORKBUN_API_KEY.substring(0, 20)}...`, 'cyan');
         log('', 'reset');
         
+        // Prompt for secret key
+        const secretKeyReceived = await promptForSecretKey();
+        if (!secretKeyReceived) {
+            logError('❌ Secret API Key is required to continue');
+            rl.close();
+            process.exit(1);
+        }
+        
         // Configure DNS
         const dnsSuccess = await configureRangoonsDNS();
         
@@ -276,8 +310,12 @@ async function main() {
             await testDNSResolution();
         }
         
+        // Close readline interface
+        rl.close();
+        
     } catch (error) {
         logError(`Fatal error: ${error.message}`);
+        rl.close();
         process.exit(1);
     }
 }
@@ -286,7 +324,8 @@ async function main() {
 module.exports = {
     configureRangoonsDNS,
     testDNSResolution,
-    makePorkbunRequest
+    makePorkbunRequest,
+    promptForSecretKey
 };
 
 // Run if called directly

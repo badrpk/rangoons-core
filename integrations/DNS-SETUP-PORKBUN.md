@@ -7,7 +7,7 @@ This guide will help you configure DNS records on Porkbun to make `www.rangoons.
 - **Domain**: `rangoons.my`
 - **Static IP**: `154.57.212.38`
 - **Porkbun API Key**: `pk1_1cbdd6744bd2857132ac1e03b0e2b0d0a7cd964d3aeab7fb1a36f296a1da388c`
-- **Porkbun Secret API Key**: [You need to provide this]
+- **Porkbun Secret API Key**: Will be prompted for during execution
 
 ## 📋 **Method 1: Automated API Configuration (Recommended)**
 
@@ -17,28 +17,27 @@ This guide will help you configure DNS records on Porkbun to make `www.rangoons.
 2. **Go to Account** → **API Access**
 3. **Copy your Secret API Key** (it looks like: `sk1_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`)
 
-### **Step 2: Configure the Script**
+### **Step 2: Run the Configuration**
 
-1. **Open** `integrations/configure-porkbun-dns.js`
-2. **Find this line**:
-   ```javascript
-   const PORKBUN_SECRET_KEY = ''; // You'll need to provide this
-   ```
-3. **Add your secret key**:
-   ```javascript
-   const PORKBUN_SECRET_KEY = 'sk1_your_secret_key_here';
-   ```
-
-### **Step 3: Run the Configuration**
+The script will automatically prompt you for your Secret API Key - no manual editing required!
 
 ```bash
-# Option 1: Use the batch file
+# Option 1: Use the batch file (easiest)
 integrations\configure-dns.bat
 
 # Option 2: Run directly
 cd integrations
 node configure-porkbun-dns.js
 ```
+
+### **Step 3: Enter Your Secret Key**
+
+When prompted, simply paste your Secret API Key and press Enter. The script will:
+- ✅ Validate your credentials
+- ✅ Fetch current DNS records
+- ✅ Create/update required records
+- ✅ Test DNS resolution
+- ✅ Provide detailed feedback
 
 ## 📋 **Method 2: Manual DNS Configuration**
 
@@ -210,9 +209,9 @@ curl http://localhost:8080/health
 
 ## 🎉 **Quick Start Summary**
 
-1. **Get Secret API Key** from Porkbun
-2. **Edit the script** with your secret key
-3. **Run DNS configuration**: `configure-dns.bat`
+1. **Get Secret API Key** from Porkbun (Account → API Access)
+2. **Run DNS configuration**: `integrations\configure-dns.bat`
+3. **Enter Secret Key** when prompted (no editing required!)
 4. **Configure router port forwarding** (80→8080)
 5. **Wait for DNS propagation** (2-6 hours)
 6. **Test external access**: `http://www.rangoons.my`

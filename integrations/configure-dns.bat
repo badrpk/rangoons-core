@@ -8,20 +8,18 @@ echo.
 
 echo 📋 Prerequisites:
 echo 1. Porkbun API Key (already configured)
-echo 2. Porkbun Secret API Key (you need to provide this)
+echo 2. Porkbun Secret API Key (will be prompted for)
 echo 3. Node.js installed
 echo.
 
 echo 🔑 To get your Porkbun Secret API Key:
 echo 1. Login to https://porkbun.com
 echo 2. Go to Account → API Access
-echo 3. Copy your Secret API Key
+echo 3. Copy your Secret API Key (starts with sk1_)
 echo.
 
-echo ⚠️  IMPORTANT: You need to edit the script and add your Secret API Key
-echo    Open integrations/configure-porkbun-dns.js
-echo    Find the line: const PORKBUN_SECRET_KEY = '';
-echo    Add your secret key between the quotes
+echo ✅ The script will automatically prompt you for the Secret API Key
+echo    No manual editing required!
 echo.
 
 pause
