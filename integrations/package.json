@@ -1,0 +1,40 @@
+{
+  "name": "rangoons-whatsapp",
+  "version": "1.0.0",
+  "description": "WhatsApp integration for RangoonsCore e-commerce",
+  "main": "shein-style-server.js",
+  "scripts": {
+    "start": "node shein-style-server.js",
+    "dev": "nodemon shein-style-server.js",
+    "install-deps": "npm install"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "body-parser": "^1.20.2",
+    "multer": "^1.4.5-lts.1",
+    "csv-parse": "^5.5.3",
+    "pg": "^8.11.3",
+    "csv-parser": "^3.0.0",
+    "@whiskeysockets/baileys": "^6.6.0",
+    "pino": "^8.17.2",
+    "qrcode": "^1.5.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "keywords": [
+    "whatsapp",
+    "e-commerce",
+    "rangoons",
+    "bot",
+    "webhook",
+    "order-processing",
+    "catalog-sync",
+    "postgresql",
+    "csv-import",
+    "shein-style",
+    "modern-ui"
+  ],
+  "author": "Rangoons Team",
+  "license": "MIT"
+}
