@@ -317,7 +317,7 @@ std::vector<Product> DB::list_products(const std::string& category, int limit, i
     
     int rows = PQntuples(result);
     for (int i = 0; i < rows; i++) {
-        Product p;
+    Product p;
         p.id = std::stoi(PQgetvalue(result, i, 0));
         p.handle = PQgetvalue(result, i, 1);
         p.title = PQgetvalue(result, i, 2);

@@ -291,7 +291,7 @@ static HttpResponse handle_home() {
                     
                     if (title.includes(query) || description.includes(query)) {
                         product.style.display = 'block';
-                    } else {
+    } else {
                         product.style.display = 'none';
                     }
                 });

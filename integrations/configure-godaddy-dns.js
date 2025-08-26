@@ -1,14 +1,14 @@
 const https = require('https');
 const readline = require('readline');
 
-// Porkbun API Configuration
-const PORKBUN_API_KEY = 'pk1_1cbdd6744bd2857132ac1e03b0e2b0d0a7cd964d3aeab7fb1a36f296a1da388c';
-let PORKBUN_SECRET_KEY = ''; // Will be prompted for
-const DOMAIN = 'rangoons.my';
+// GoDaddy API Configuration
+const GODADDY_API_KEY = 'dKD7eEsrwY6x_D8Uze31RdTNyX66c9BdUhz';
+const GODADDY_SECRET = 'KTBqgbvRxq1XWkV5WKtjNR';
+const DOMAIN = 'rangoons.live'; // Your actual GoDaddy domain
 const STATIC_IP = '154.57.212.38';
 
-// Porkbun API endpoints
-const PORKBUN_API_BASE = 'https://porkbun.com/api/json/v3';
+// GoDaddy API endpoints
+const GODADDY_API_BASE = 'https://api.godaddy.com/v1';
 
 // Create readline interface for user input
 const rl = readline.createInterface({
@@ -48,61 +48,65 @@ function logInfo(message) {
     log(`ℹ️  ${message}`, 'blue');
 }
 
-// Prompt user for secret key
-function promptForSecretKey() {
+// Prompt user for domain confirmation
+function promptForDomain() {
     return new Promise((resolve) => {
         log('', 'reset');
-        log('🔑 Porkbun Secret API Key Required', 'bright');
-        log('====================================', 'bright');
+        log('🌐 GoDaddy Domain Configuration', 'bright');
+        log('================================', 'bright');
         log('', 'reset');
-        logInfo('To get your Secret API Key:');
-        log('1. Login to https://porkbun.com', 'cyan');
-        log('2. Go to Account → API Access', 'cyan');
-        log('3. Copy your Secret API Key (starts with sk1_)', 'cyan');
+        logInfo(`Current domain: ${DOMAIN}`);
+        logInfo(`Static IP: ${STATIC_IP}`);
+        logInfo(`API Key: ${GODADDY_API_KEY.substring(0, 20)}...`);
         log('', 'reset');
         
-        rl.question('Enter your Porkbun Secret API Key: ', (secretKey) => {
-            if (secretKey.trim()) {
-                PORKBUN_SECRET_KEY = secretKey.trim();
-                logSuccess('Secret API Key received!');
-                resolve(true);
+        rl.question(`Is ${DOMAIN} correct? (y/n): `, (answer) => {
+            if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
+                logSuccess('Domain confirmed!');
+                resolve(DOMAIN);
             } else {
-                logError('Secret API Key cannot be empty!');
-                resolve(false);
+                rl.question('Enter your GoDaddy domain (e.g., rangoons.com): ', (newDomain) => {
+                    if (newDomain.trim()) {
+                        logSuccess(`Domain set to: ${newDomain.trim()}`);
+                        resolve(newDomain.trim());
+                    } else {
+                        logError('Domain cannot be empty!');
+                        resolve(DOMAIN);
+                    }
+                });
             }
         });
     });
 }
 
-// Make HTTPS request to Porkbun API
-function makePorkbunRequest(endpoint, data) {
+// Make HTTPS request to GoDaddy API
+function makeGodaddyRequest(endpoint, method = 'GET', data = null) {
     return new Promise((resolve, reject) => {
-        const postData = JSON.stringify({
-            apikey: PORKBUN_API_KEY,
-            secretapikey: PORKBUN_SECRET_KEY,
-            ...data
-        });
-
         const options = {
-            hostname: 'porkbun.com',
+            hostname: 'api.godaddy.com',
             port: 443,
-            path: `/api/json/v3${endpoint}`,
-            method: 'POST',
+            path: `/v1${endpoint}`,
+            method: method,
             headers: {
+                'Authorization': `sso-key ${GODADDY_API_KEY}:${GODADDY_SECRET}`,
                 'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(postData),
                 'User-Agent': 'Rangoons-DNS-Config/1.0'
             }
         };
 
-        logInfo(`Making API request to: ${endpoint}`);
-        logInfo(`Request data: ${JSON.stringify({ apikey: PORKBUN_API_KEY.substring(0, 20) + '...', secretapikey: PORKBUN_SECRET_KEY.substring(0, 20) + '...', ...data })}`);
+        if (data) {
+            options.headers['Content-Length'] = Buffer.byteLength(JSON.stringify(data));
+        }
+
+        logInfo(`Making ${method} request to: ${endpoint}`);
+        if (data) {
+            logInfo(`Request data: ${JSON.stringify(data)}`);
+        }
 
         const req = https.request(options, (res) => {
             let responseData = '';
             
             logInfo(`Response status: ${res.statusCode} ${res.statusMessage}`);
-            logInfo(`Response headers: ${JSON.stringify(res.headers)}`);
             
             res.on('data', (chunk) => {
                 responseData += chunk;
@@ -111,24 +115,36 @@ function makePorkbunRequest(endpoint, data) {
             res.on('end', () => {
                 logInfo(`Response body: ${responseData.substring(0, 200)}${responseData.length > 200 ? '...' : ''}`);
                 
-                if (res.statusCode === 403) {
-                    logError('❌ 403 Forbidden - This usually means:');
-                    logError('   - API key or secret key is incorrect');
-                    logError('   - API access is not enabled for your account');
-                    logError('   - Domain ownership verification issue');
-                    logError('   - Rate limiting or IP restriction');
-                    reject(new Error(`403 Forbidden: ${responseData}`));
+                if (res.statusCode === 401) {
+                    logError('❌ 401 Unauthorized - API credentials are invalid');
+                    reject(new Error('Invalid API credentials'));
                     return;
                 }
                 
-                if (res.statusCode !== 200) {
+                if (res.statusCode === 403) {
+                    logError('❌ 403 Forbidden - API key may not have permission for this domain');
+                    reject(new Error('API key permission denied'));
+                    return;
+                }
+                
+                if (res.statusCode === 404) {
+                    logError('❌ 404 Not Found - Domain may not exist or API key has no access');
+                    reject(new Error('Domain not found or no access'));
+                    return;
+                }
+                
+                if (res.statusCode !== 200 && res.statusCode !== 201) {
                     reject(new Error(`HTTP ${res.statusCode}: ${responseData}`));
                     return;
                 }
                 
                 try {
-                    const parsed = JSON.parse(responseData);
-                    resolve(parsed);
+                    if (responseData.trim()) {
+                        const parsed = JSON.parse(responseData);
+                        resolve(parsed);
+                    } else {
+                        resolve({});
+                    }
                 } catch (error) {
                     reject(new Error(`Failed to parse response: ${responseData}`));
                 }
@@ -139,22 +155,24 @@ function makePorkbunRequest(endpoint, data) {
             reject(error);
         });
 
-        req.write(postData);
+        if (data) {
+            req.write(JSON.stringify(data));
+        }
         req.end();
     });
 }
 
-// Test API credentials first
+// Test API credentials
 async function testAPICredentials() {
     try {
-        logInfo('🧪 Testing API credentials...');
-        const response = await makePorkbunRequest('/ping');
+        logInfo('🧪 Testing GoDaddy API credentials...');
+        const response = await makeGodaddyRequest('/domains');
         
-        if (response.status === 'SUCCESS') {
-            logSuccess('✅ API credentials are valid!');
+        if (Array.isArray(response)) {
+            logSuccess(`✅ API credentials are valid! Found ${response.length} domains`);
             return true;
         } else {
-            logError(`❌ API test failed: ${response.message}`);
+            logError(`❌ API test failed: Unexpected response format`);
             return false;
         }
     } catch (error) {
@@ -164,16 +182,16 @@ async function testAPICredentials() {
 }
 
 // Get current DNS records
-async function getCurrentDNSRecords() {
+async function getCurrentDNSRecords(domain) {
     try {
-        logInfo('Fetching current DNS records...');
-        const response = await makePorkbunRequest(`/dns/retrieve/${DOMAIN}`);
+        logInfo(`Fetching current DNS records for ${domain}...`);
+        const response = await makeGodaddyRequest(`/domains/${domain}/records`);
         
-        if (response.status === 'SUCCESS') {
-            logSuccess(`Found ${response.records.length} DNS records`);
-            return response.records;
+        if (Array.isArray(response)) {
+            logSuccess(`Found ${response.length} DNS records`);
+            return response;
         } else {
-            logError(`Failed to retrieve DNS records: ${response.message}`);
+            logError(`Failed to retrieve DNS records: Unexpected response format`);
             return [];
         }
     } catch (error) {
@@ -183,29 +201,30 @@ async function getCurrentDNSRecords() {
 }
 
 // Create or update DNS record
-async function createOrUpdateDNSRecord(record) {
+async function createOrUpdateDNSRecord(domain, record) {
     try {
-        const endpoint = record.id ? `/dns/edit/${DOMAIN}/${record.id}` : `/dns/create/${DOMAIN}`;
-        const data = record.id ? record : record;
+        const endpoint = `/domains/${domain}/records/${record.type}/${record.name || '@'}`;
         
-        const response = await makePorkbunRequest(endpoint, data);
+        // GoDaddy API expects array of records
+        const recordData = [{
+            data: record.content,
+            ttl: parseInt(record.ttl),
+            name: record.name || '@',
+            type: record.type
+        }];
         
-        if (response.status === 'SUCCESS') {
-            const action = record.id ? 'updated' : 'created';
-            logSuccess(`DNS record ${action}: ${record.name || '@'} → ${record.content}`);
-            return true;
-        } else {
-            logError(`Failed to ${record.id ? 'update' : 'create'} DNS record: ${response.message}`);
-            return false;
-        }
+        const response = await makeGodaddyRequest(endpoint, 'PUT', recordData);
+        
+        logSuccess(`DNS record ${record.name || '@'} (${record.type}) → ${record.content}`);
+        return true;
     } catch (error) {
-        logError(`Error ${record.id ? 'updating' : 'creating'} DNS record: ${error.message}`);
+        logError(`Error creating/updating DNS record: ${error.message}`);
         return false;
     }
 }
 
 // Configure DNS records for Rangoons
-async function configureRangoonsDNS() {
+async function configureRangoonsDNS(domain) {
     log('🚀 Configuring DNS Records for Rangoons Edge Computing System', 'bright');
     log('================================================================', 'bright');
     
@@ -217,7 +236,7 @@ async function configureRangoonsDNS() {
     }
     
     // Get current records
-    const currentRecords = await getCurrentDNSRecords();
+    const currentRecords = await getCurrentDNSRecords(domain);
     
     // Define required DNS records
     const requiredRecords = [
@@ -225,15 +244,13 @@ async function configureRangoonsDNS() {
             name: '@',
             type: 'A',
             content: STATIC_IP,
-            ttl: '300',
-            notes: 'Rangoons Primary Server'
+            ttl: '600'
         },
         {
             name: 'www',
             type: 'A',
             content: STATIC_IP,
-            ttl: '300',
-            notes: 'Rangoons WWW Subdomain'
+            ttl: '600'
         }
     ];
     
@@ -247,23 +264,22 @@ async function configureRangoonsDNS() {
     
     for (const requiredRecord of requiredRecords) {
         const existingRecord = currentRecords.find(record => 
-            record.name === requiredRecord.name && record.type === requiredRecord.type
+            record.name === (requiredRecord.name || '@') && record.type === requiredRecord.type
         );
         
         if (existingRecord) {
-            if (existingRecord.content === requiredRecord.content) {
+            if (existingRecord.data === requiredRecord.content) {
                 logSuccess(`Record already correct: ${requiredRecord.name || '@'} → ${requiredRecord.content}`);
                 successCount++;
             } else {
                 logWarning(`Updating existing record: ${requiredRecord.name || '@'} → ${requiredRecord.content}`);
-                requiredRecord.id = existingRecord.id;
-                if (await createOrUpdateDNSRecord(requiredRecord)) {
+                if (await createOrUpdateDNSRecord(domain, requiredRecord)) {
                     successCount++;
                 }
             }
         } else {
             logInfo(`Creating new record: ${requiredRecord.name || '@'} → ${requiredRecord.content}`);
-            if (await createOrUpdateDNSRecord(requiredRecord)) {
+            if (await createOrUpdateDNSRecord(domain, requiredRecord)) {
                 successCount++;
             }
         }
@@ -284,14 +300,14 @@ async function configureRangoonsDNS() {
         log('📋 Next Steps:', 'bright');
         log('1. Wait for DNS propagation (15 minutes to 48 hours)', 'cyan');
         log('2. Configure router port forwarding (80→8080, 443→8080)', 'cyan');
-        log('3. Test with: http://www.rangoons.my', 'cyan');
+        log(`3. Test with: http://www.${domain}`, 'cyan');
         log('4. Your edge computing system will be accessible externally!', 'cyan');
         
         log('', 'reset');
         log('🔍 Test DNS propagation:', 'bright');
-        log(`   nslookup www.rangoons.my`, 'cyan');
-        log(`   ping www.rangoons.my`, 'cyan');
-        log(`   curl -I http://www.rangoons.my`, 'cyan');
+        log(`   nslookup www.${domain}`, 'cyan');
+        log(`   ping www.${domain}`, 'cyan');
+        log(`   curl -I http://www.${domain}`, 'cyan');
         
         return true;
     } else {
@@ -301,7 +317,7 @@ async function configureRangoonsDNS() {
 }
 
 // Test DNS resolution
-async function testDNSResolution() {
+async function testDNSResolution(domain) {
     log('', 'reset');
     log('🧪 Testing DNS Resolution', 'bright');
     log('==========================', 'bright');
@@ -309,7 +325,7 @@ async function testDNSResolution() {
     const { exec } = require('child_process');
     
     return new Promise((resolve) => {
-        exec(`nslookup www.${DOMAIN}`, (error, stdout, stderr) => {
+        exec(`nslookup www.${domain}`, (error, stdout, stderr) => {
             if (error) {
                 logError(`DNS lookup failed: ${error.message}`);
                 resolve(false);
@@ -317,7 +333,7 @@ async function testDNSResolution() {
             }
             
             if (stdout.includes(STATIC_IP)) {
-                logSuccess(`✅ DNS resolution working: www.${DOMAIN} → ${STATIC_IP}`);
+                logSuccess(`✅ DNS resolution working: www.${domain} → ${STATIC_IP}`);
                 resolve(true);
             } else {
                 logWarning(`⚠️  DNS not yet propagated or incorrect`);
@@ -332,23 +348,17 @@ async function testDNSResolution() {
 // Main execution
 async function main() {
     try {
-        log('🌐 Rangoons DNS Configuration Tool', 'bright');
-        log('==================================', 'bright');
-        log(`Domain: ${DOMAIN}`, 'cyan');
+        log('🌐 Rangoons GoDaddy DNS Configuration Tool', 'bright');
+        log('============================================', 'bright');
         log(`Static IP: ${STATIC_IP}`, 'cyan');
-        log(`Porkbun API: ${PORKBUN_API_KEY.substring(0, 20)}...`, 'cyan');
+        log(`GoDaddy API: ${GODADDY_API_KEY.substring(0, 20)}...`, 'cyan');
         log('', 'reset');
         
-        // Prompt for secret key
-        const secretKeyReceived = await promptForSecretKey();
-        if (!secretKeyReceived) {
-            logError('❌ Secret API Key is required to continue');
-            rl.close();
-            process.exit(1);
-        }
+        // Prompt for domain confirmation
+        const confirmedDomain = await promptForDomain();
         
         // Configure DNS
-        const dnsSuccess = await configureRangoonsDNS();
+        const dnsSuccess = await configureRangoonsDNS(confirmedDomain);
         
         if (dnsSuccess) {
             // Wait a bit for DNS to start propagating
@@ -357,7 +367,7 @@ async function main() {
             await new Promise(resolve => setTimeout(resolve, 30000));
             
             // Test DNS resolution
-            await testDNSResolution();
+            await testDNSResolution(confirmedDomain);
         }
         
         // Close readline interface
@@ -374,8 +384,8 @@ async function main() {
 module.exports = {
     configureRangoonsDNS,
     testDNSResolution,
-    makePorkbunRequest,
-    promptForSecretKey,
+    makeGodaddyRequest,
+    promptForDomain,
     testAPICredentials
 };
 
